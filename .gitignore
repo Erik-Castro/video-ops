@@ -1,0 +1,7 @@
+# Encrypted media (test artifacts)
+*.enc
+*.key
+*.part
+
+# Termux / agent artifacts
+.atl/
