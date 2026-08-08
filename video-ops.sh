@@ -167,20 +167,23 @@ do_play_android() {
     __openssl_pid=$!
 
     echo "Starting HTTP server..."
+    local media_ext="${infile##*.}"
+    media_ext="${media_ext%.enc}"
     python3 -c "
-import sys
+import sys, mimetypes
 from http.server import HTTPServer, BaseHTTPRequestHandler
 
 class StreamHandler(BaseHTTPRequestHandler):
     def do_GET(self):
         self.send_response(200)
-        self.send_header('Content-Type', 'video/mp4')
+        mime = mimetypes.guess_type(f'file.{sys.argv[3]}')[0] or 'application/octet-stream'
+        self.send_header('Content-Type', mime)
         self.send_header('Connection', 'close')
         self.end_headers()
         try:
             with open(sys.argv[1], 'rb') as f:
                 while True:
-                    data = f.read(65536)
+                    data = f.read(4096)
                     if not data:
                         break
                     self.wfile.write(data)
@@ -195,7 +198,7 @@ server = HTTPServer(('127.0.0.1', 0), StreamHandler)
 with open(sys.argv[2], 'w') as f:
     f.write(f'http://127.0.0.1:{server.server_address[1]}')
 server.serve_forever()
-" "$__fifo" "$__urlfile" &
+" "$__fifo" "$__urlfile" "$media_ext" &
     __py_pid=$!
 
     local url=""
