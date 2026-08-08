@@ -13,6 +13,7 @@ Usage: $(basename "$0") <command> [options] <args>
 Commands:
     download <url>       Download video with yt-dlp and encrypt it
     play <file>          Decrypt and play a video file
+    stop                 Kill lingering server/decrypt processes
 
 Options:
     -k, --key <path>     Encryption key file path (default: <filename>.key)
@@ -132,10 +133,7 @@ wait_for_url() {
 __android_cleanup() {
     [[ "${__cleanup_done:-0}" -eq 1 ]] && return
     __cleanup_done=1
-    echo "Cleaning up..."
-    [[ -n "${__openssl_pid:-}" ]] && kill "$__openssl_pid" 2>/dev/null
-    [[ -n "${__py_pid:-}" ]] && kill "$__py_pid" 2>/dev/null
-    rm -f "${__fifo:-}" "${__urlfile:-}"
+    rm -f "${__urlfile:-}"
 }
 
 do_play_android() {
@@ -152,24 +150,23 @@ do_play_android() {
     [[ ! -f "$keyfile" ]] && die "Key file not found: $keyfile"
 
     __cleanup_done=0
-    __openssl_pid=""
-    __py_pid=""
     __fifo="${TMPDIR:-/tmp}/video-ops-$$-$(date +%s).fifo"
     __urlfile="${TMPDIR:-/tmp}/video-ops-$$-$(date +%s).url"
-    trap __android_cleanup EXIT INT TERM
+    trap __android_cleanup EXIT
 
     mkfifo "$__fifo"
 
     echo "Starting decryption..."
-    openssl enc -a -d -aes-256-ctr -iter 320000 -pbkdf2 \
+    setsid openssl enc -a -d -aes-256-ctr -iter 320000 -pbkdf2 \
         -pass "file:${keyfile}" \
-        -in "$infile" > "$__fifo" &
-    __openssl_pid=$!
+        -in "$infile" > "$__fifo" 2>/dev/null &
+    local openssl_pid=$!
+    disown "$openssl_pid"
 
     echo "Starting HTTP server..."
     local media_ext="${infile##*.}"
     media_ext="${media_ext%.enc}"
-    python3 -c "
+    setsid python3 -c "
 import sys, mimetypes
 from http.server import HTTPServer, BaseHTTPRequestHandler
 
@@ -201,15 +198,26 @@ server = QuietServer(('127.0.0.1', 0), StreamHandler)
 with open(sys.argv[2], 'w') as f:
     f.write(f'http://127.0.0.1:{server.server_address[1]}')
 server.serve_forever()
-" "$__fifo" "$__urlfile" "$media_ext" &
-    __py_pid=$!
+" "$__fifo" "$__urlfile" "$media_ext" 2>/dev/null &
+    local py_pid=$!
+    disown "$py_pid"
 
     local url=""
     url=$(wait_for_url "$__urlfile")
 
     [[ -z "$url" ]] && die "Failed to start HTTP server"
 
-    echo "Opening: $url"
+    echo ""
+    echo "╔══════════════════════════════════════════════════╗"
+    echo "║  Streaming: $url"
+    echo "║  Server PID: $py_pid"
+    echo "║  Decrypt PID: $openssl_pid"
+    echo "║"
+    echo "║  Press Ctrl+C — playback continues!"
+    echo "║  To stop: kill $py_pid $openssl_pid"
+    echo "╚══════════════════════════════════════════════════╝"
+    echo ""
+
     if command -v am &>/dev/null; then
         am start -n org.videolan.vlc/.gui.video.VideoPlayerActivity -d "$url" 2>/dev/null \
             || am start -a android.intent.action.VIEW -d "$url" 2>/dev/null
@@ -218,8 +226,46 @@ server.serve_forever()
     else
         die "No way to open Android player (am or termux-open not found)"
     fi
+}
 
-    wait "$__py_pid" 2>/dev/null
+do_stop() {
+    local pids=()
+    while IFS= read -r pid; do
+        pids+=("$pid")
+    done < <(pgrep -f "openssl enc.*aes-256-ctr" 2>/dev/null || true)
+    while IFS= read -r pid; do
+        pids+=("$pid")
+    done < <(pgrep -f "python3 -c.*HTTPServer" 2>/dev/null || true)
+
+    if (( ${#pids[@]} == 0 )); then
+        echo "No lingering video-ops processes found."
+        return
+    fi
+
+    # Deduplicate
+    local unique_pids=()
+    for pid in "${pids[@]}"; do
+        [[ ! " ${unique_pids[*]:-} " =~ " $pid " ]] && unique_pids+=("$pid")
+    done
+    pids=("${unique_pids[@]}")
+
+    echo "Found ${#pids[@]} process(es):"
+    for pid in "${pids[@]}"; do
+        local cmd
+        cmd=$(ps -p "$pid" -o args= 2>/dev/null || echo "unknown")
+        echo "  PID $pid: $cmd"
+    done
+
+    read -r -p "Kill all? [y/N] " confirm
+    if [[ "$confirm" =~ ^[Yy]$ ]]; then
+        for pid in "${pids[@]}"; do
+            kill "$pid" 2>/dev/null && echo "Killed $pid" || echo "Failed to kill $pid"
+        done
+        rm -f "${TMPDIR:-/tmp}"/video-ops-*.fifo "${TMPDIR:-/tmp}"/video-ops-*.url
+        echo "Cleanup complete."
+    else
+        echo "Aborted."
+    fi
 }
 
 main() {
@@ -260,8 +306,9 @@ main() {
                 do_play "$1" "$KEY_PATH"
             fi
             ;;
+        stop)       do_stop ;;
         -h|--help|help) usage ;;
-        *) die "Unknown command: $ACTION (use 'download' or 'play')" ;;
+        *) die "Unknown command: $ACTION (use 'download', 'play', or 'stop')" ;;
     esac
 }
 
