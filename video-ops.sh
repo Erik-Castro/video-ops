@@ -176,9 +176,8 @@ from http.server import HTTPServer, BaseHTTPRequestHandler
 class StreamHandler(BaseHTTPRequestHandler):
     def do_GET(self):
         self.send_response(200)
-        mime = mimetypes.guess_type(f'file.{sys.argv[3]}')[0] or 'application/octet-stream'
+        mime = mimetypes.guess_type(f'file.{sys.argv[3]}')[0] or 'video/MP2T'
         self.send_header('Content-Type', mime)
-        self.send_header('Connection', 'close')
         self.end_headers()
         try:
             with open(sys.argv[1], 'rb') as f:
@@ -211,12 +210,13 @@ server.serve_forever()
     [[ -z "$url" ]] && die "Failed to start HTTP server"
 
     echo "Opening: $url"
-    if command -v termux-open &>/dev/null; then
+    if command -v am &>/dev/null; then
+        am start -n org.videolan.vlc/.gui.video.VideoPlayerActivity -d "$url" 2>/dev/null \
+            || am start -a android.intent.action.VIEW -d "$url" 2>/dev/null
+    elif command -v termux-open &>/dev/null; then
         termux-open "$url"
-    elif command -v am &>/dev/null; then
-        am start -a android.intent.action.VIEW -d "$url" 2>/dev/null
     else
-        die "No way to open Android player (termux-open or am not found)"
+        die "No way to open Android player (am or termux-open not found)"
     fi
 
     wait "$__py_pid" 2>/dev/null
