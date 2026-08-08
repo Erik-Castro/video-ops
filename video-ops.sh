@@ -154,8 +154,8 @@ do_play_android() {
     __cleanup_done=0
     __openssl_pid=""
     __py_pid=""
-    __fifo="/tmp/video-ops-$$-$(date +%s).fifo"
-    __urlfile="/tmp/video-ops-$$-$(date +%s).url"
+    __fifo="${TMPDIR:-/tmp}/video-ops-$$-$(date +%s).fifo"
+    __urlfile="${TMPDIR:-/tmp}/video-ops-$$-$(date +%s).url"
     trap __android_cleanup EXIT INT TERM
 
     mkfifo "$__fifo"
