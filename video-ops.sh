@@ -67,6 +67,7 @@ do_download() {
 
     local name
     name=$(yt-dlp --print title "$url" 2>/dev/null \
+        | tr '[:upper:]' '[:lower:]' \
         | sed 's/[^a-zA-Z0-9_-]/_/g; s/__*/_/g; s/^_//; s/_$//' \
         | cut -c1-12 \
         || echo "video")
