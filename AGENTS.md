@@ -20,6 +20,10 @@ Script checks deps on startup — will fail fast with missing command list.
 # Decrypt and play (ASCII art mode)
 ./video-ops.sh play video.mp4.enc
 ./video-ops.sh play -k custom.key video.mp4.enc
+
+# Decrypt and play in Android VLC (no intermediate files)
+./video-ops.sh play --android video.mp4.enc
+./video-ops.sh play -k custom.key --android video.mp4.enc
 ```
 
 ## Key behaviors
@@ -29,9 +33,11 @@ Script checks deps on startup — will fail fast with missing command list.
 - **Extension detection**: Queries yt-dlp for format, falls back to mp4
 - **Output naming**: `<title>.<ext>.enc` with corresponding `.key` file
 - **Play pipeline**: Decrypts to stdout → pipes to VLC with caca video output (ASCII art)
+- **Play --android**: Decrypts → FIFO → Python HTTP server → Android VLC (no temp files left behind)
 
 ## Conventions
 
 - Script uses `set -euo pipefail` — fails on errors, undefined vars, pipe failures
 - Key files are base64-encoded 32-byte random data
 - Encrypted files use AES-256-CTR with PBKDF2 (320k iterations)
+- Android playback uses FIFO + local HTTP server for zero-file streaming
