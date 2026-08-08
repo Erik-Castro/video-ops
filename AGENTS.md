@@ -31,7 +31,7 @@ Script checks deps on startup — will fail fast with missing command list.
 - **Auto-generated keys**: If no `-k` flag, creates `<filename>.key` with `openssl rand -base64 32`
 - **Key reuse**: Won't overwrite existing key files — uses them instead
 - **Extension detection**: Queries yt-dlp for format, falls back to mp4
-- **Output naming**: `<title>.<ext>.enc` with corresponding `.key` file
+- **Output naming**: `<title>.<ext>.enc` with corresponding `.key` file (title sanitized: max 12 chars, underscores for spaces/special chars)
 - **Play pipeline**: Decrypts to stdout → pipes to VLC with caca video output (ASCII art)
 - **Play --android**: Decrypts → FIFO → Python HTTP server → Android VLC (no temp files left behind)
 

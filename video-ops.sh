@@ -66,7 +66,10 @@ do_download() {
     fi
 
     local name
-    name=$(yt-dlp --print title "$url" 2>/dev/null | sed 's/[\/\\:]/-/g' || echo "video")
+    name=$(yt-dlp --print title "$url" 2>/dev/null \
+        | sed 's/[^a-zA-Z0-9_-]/_/g; s/__*/_/g; s/^_//; s/_$//' \
+        | cut -c1-12 \
+        || echo "video")
     local base="${name}.${ext}"
     local outfile="${base}.enc"
 
