@@ -188,13 +188,17 @@ class StreamHandler(BaseHTTPRequestHandler):
                         break
                     self.wfile.write(data)
                     self.wfile.flush()
-        except BrokenPipeError:
+        except (BrokenPipeError, ConnectionResetError):
             pass
 
     def log_message(self, format, *args):
         pass
 
-server = HTTPServer(('127.0.0.1', 0), StreamHandler)
+class QuietServer(HTTPServer):
+    def handle_error(self, request, client_address):
+        pass
+
+server = QuietServer(('127.0.0.1', 0), StreamHandler)
 with open(sys.argv[2], 'w') as f:
     f.write(f'http://127.0.0.1:{server.server_address[1]}')
 server.serve_forever()
