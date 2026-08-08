@@ -1,7 +1,33 @@
-# Encrypted media (test artifacts)
+# Encrypted media
 *.enc
 *.key
+
+# Partial downloads
 *.part
+*.part.*
+
+# Temp files
+*.tmp
+*.temp
+~*
+
+# Video files (keep only encrypted)
+*.mp4
+*.webm
+*.mkv
+*.avi
+*.mov
 
 # Termux / agent artifacts
 .atl/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Editor files
+*.swp
+*.swo
+*~
+.vscode/
+.idea/
