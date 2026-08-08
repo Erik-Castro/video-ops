@@ -194,8 +194,7 @@ class StreamHandler(BaseHTTPRequestHandler):
 server = HTTPServer(('127.0.0.1', 0), StreamHandler)
 with open(sys.argv[2], 'w') as f:
     f.write(f'http://127.0.0.1:{server.server_address[1]}')
-server.handle_request()
-server.server_close()
+server.serve_forever()
 " "$__fifo" "$__urlfile" &
     __py_pid=$!
 
