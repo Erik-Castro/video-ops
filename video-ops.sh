@@ -4,6 +4,7 @@ umask 077
 
 KEY_PATH=""
 EXT=""
+OUTPUT_NAME=""
 ACTION=""
 ANDROID_MODE=0
 
@@ -19,12 +20,14 @@ Commands:
 Options:
     -k, --key <path>     Encryption key file path (default: <filename>.key)
     -e, --ext <ext>      Output extension for download (default: auto-detect)
+    -o, --output <name>  Output filename base (download only, default: auto from title)
     --android            Open in Android VLC instead of terminal (play only)
     -h, --help           Show this help message
 
 Examples:
     $(basename "$0") download https://youtube.com/watch?v=xxx
     $(basename "$0") download -k my.key https://youtube.com/watch?v=xxx
+    $(basename "$0") download -o myvideo https://youtube.com/watch?v=xxx
     $(basename "$0") play video.mp4
     $(basename "$0") play -k my.key video.mp4
     $(basename "$0") play --android video.mp4
@@ -58,6 +61,7 @@ do_download() {
     local url="$1"
     local keyfile="$2"
     local ext="$3"
+    local output_name="${4:-}"
 
     [[ -z "$url" ]] && die "URL is required for download"
     [[ "$url" != http* ]] && die "Invalid URL: $url"
@@ -68,11 +72,15 @@ do_download() {
     fi
 
     local name
-    name=$(yt-dlp --print title "$url" 2>/dev/null \
-        | tr '[:upper:]' '[:lower:]' \
-        | sed 's/[^a-zA-Z0-9_-]/_/g; s/__*/_/g; s/^_//; s/_$//' \
-        | cut -c1-12 \
-        || echo "video")
+    if [[ -n "$output_name" ]]; then
+        name="$output_name"
+    else
+        name=$(yt-dlp --print title "$url" 2>/dev/null \
+            | tr '[:upper:]' '[:lower:]' \
+            | sed 's/[^a-zA-Z0-9_-]/_/g; s/__*/_/g; s/^_//; s/_$//' \
+            | cut -c1-12 \
+            || echo "video")
+    fi
     local base="${name}.${ext}"
     local outfile="${base}.enc"
 
@@ -174,7 +182,7 @@ from http.server import HTTPServer, BaseHTTPRequestHandler
 class StreamHandler(BaseHTTPRequestHandler):
     def do_GET(self):
         self.send_response(200)
-        mime = mimetypes.guess_type(f'file.{sys.argv[3]}')[0] or 'video/MP2T'
+        mime = mimetypes.guess_type(f'file.{sys.argv[3]}')[0] or 'video/mp4'
         self.send_header('Content-Type', mime)
         self.end_headers()
         try:
@@ -280,15 +288,16 @@ main() {
         download)
             while (( $# > 0 )); do
                 case "$1" in
-                    -k|--key)  KEY_PATH="$2"; shift 2 ;;
-                    -e|--ext)  EXT="$2"; shift 2 ;;
-                    -h|--help) usage ;;
-                    -*)        die "Unknown option: $1" ;;
-                    *)         break ;;
+                    -k|--key)    KEY_PATH="$2"; shift 2 ;;
+                    -e|--ext)    EXT="$2"; shift 2 ;;
+                    -o|--output) OUTPUT_NAME="$2"; shift 2 ;;
+                    -h|--help)   usage ;;
+                    -*)          die "Unknown option: $1" ;;
+                    *)           break ;;
                 esac
             done
             [[ -z "${1:-}" ]] && die "URL is required"
-            do_download "$1" "$KEY_PATH" "$EXT"
+            do_download "$1" "$KEY_PATH" "$EXT" "$OUTPUT_NAME"
             ;;
         play)
             while (( $# > 0 )); do
